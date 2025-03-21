@@ -1,8 +1,11 @@
 import numpy as np
 import pandas as pd
+import statsmodels.api as sm
+from scipy.stats import norm
+import scipy.optimize as optim
 
 def simulate_hsv_sample(
-        n=int, tau=float, theta=float, ell=float, sigma=float,
+        n, tau, theta, ell, sigma,
         seed=None, weights=False
         ):
     # Set random seed for reproducibility
@@ -38,8 +41,8 @@ def simulate_hsv_sample(
     df = pd.DataFrame({
         'income': income,  # Market income
         'net_income': net_income,  # Net income after taxes
-        'working': working,  # Household size
-        'household_size': household_size,  # Non-dependents in household
+        'working': working,  # Number of working adults
+        'household_size': household_size,  # Total household size
     })
 
     if weights:
@@ -50,3 +53,80 @@ def simulate_hsv_sample(
     df = df[(df['income'] > 0) & (df['net_income'] > 0)] 
 
     return df
+
+def generate_ols_model(df):
+    X = np.log(df[['income', 'household_size']])
+    X = sm.add_constant(X)
+    y = np.log(df['net_income']) + np.log(df['working'])
+
+    model = sm.OLS(y, X).fit()
+
+    return model
+
+def get_sigma_hat(model):
+    sigma_hat = pow(np.var(model.resid), 1/2)
+    return sigma_hat
+
+def generate_mle_model(df, initial_params):
+    # Split dataframe
+    # // is the floor division operator
+    half_index = df.shape[0] // 2
+
+    df_2 = pd.concat([
+        # .iloc[:x] selects all rows from the beginning up to, but not including, the row at position x
+            df.iloc[:half_index], 
+            df.iloc[half_index:].reset_index(drop = True)
+        ], axis=1)
+
+    # Rename columns
+    column_names = df.columns
+
+    new_column_names = []
+    for k in column_names:
+        new_name = str(k) + "_i"
+        new_column_names.append(new_name)
+    for k in column_names:
+        new_name = str(k) + "_j"
+        new_column_names.append(new_name)
+
+    df_2.columns = new_column_names
+
+    # Add a rank indicator variable
+
+    df_2 = df_2.assign(
+        atr_i = df_2['net_income_i'] / df_2['income_i'],
+        atr_j = df_2['net_income_j'] / df_2['income_j'],
+    )
+
+    df_2 = df_2.assign(
+        rank_binary = np.where(df_2['atr_i'] < df_2['atr_j'], 1, 0)
+    )
+
+    # Specify a log-likelihood function
+    def neg_log_likelihood(params, data):
+        tau, theta, sigma = params
+        
+        # Specify random variable
+        randvar = (
+                tau * np.log(data['net_income_i'] / data['net_income_j'])
+                + np.log(data['working_i'] / data['working_j'])
+                - theta * (
+                    np.log(data['household_size_i'] / data['household_size_j'])
+                )
+        )
+        # Specify CDF
+        cdf = norm.cdf(randvar, scale = np.pow(sigma, 1/2))
+
+        # Now specify log-likelihood function
+        log_likelihood = np.sum(
+            data['rank_binary'] * np.log(cdf) 
+            + (1 - data['rank_binary']) * np.log(1 - cdf)
+        )
+        return -log_likelihood
+
+    model = optim.minimize(
+        neg_log_likelihood, initial_params, args = (df_2,),
+        method='BFGS'
+        )
+    
+    return model
