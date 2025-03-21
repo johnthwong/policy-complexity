@@ -129,6 +129,6 @@ def generate_mle_model(df, initial_params):
         method='BFGS'
         )
     
-    print(f"Estimates are {model.x}.")
+    # print(f"Estimates are {model.x}.")
     
     return model
