@@ -108,14 +108,14 @@ def generate_mle_model(df, initial_params):
         
         # Specify random variable
         randvar = (
-                tau * np.log(data['net_income_i'] / data['net_income_j'])
+                tau * np.log(data['income_i'] / data['income_j'])
                 + np.log(data['working_i'] / data['working_j'])
                 - theta * (
                     np.log(data['household_size_i'] / data['household_size_j'])
                 )
         )
         # Specify CDF
-        cdf = norm.cdf(randvar, scale = np.pow(sigma, 1/2))
+        cdf = norm.cdf(randvar, scale = np.pow(2, 1/2)*sigma)
 
         # Now specify log-likelihood function
         log_likelihood = np.sum(
@@ -128,5 +128,7 @@ def generate_mle_model(df, initial_params):
         neg_log_likelihood, initial_params, args = (df_2,),
         method='BFGS'
         )
+    
+    print(f"Estimates are {model.x}.")
     
     return model
