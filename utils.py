@@ -84,6 +84,9 @@ def generate_mle_model(df, initial_params):
     # // is the floor division operator
     half_index = df.shape[0] // 2
 
+    if df.shape[0] % 2 != 0:
+        df = df.drop(df.index[-1])
+
     df_2 = pd.concat([
         # .iloc[:x] selects all rows from the beginning up to, but not including, the row at position x
             df.iloc[:half_index], 
