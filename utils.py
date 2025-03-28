@@ -63,19 +63,28 @@ def generate_ols_model(df):
 
     return model
 
-def get_sigma_hat(df, corr=None):
+def get_sigma_hat(df, type=None):
     model = generate_ols_model(df)
     sigma_hat = pow(np.var(model.resid), 1/2)
     
-    if corr is not True:
+    if (type is None) or (type == "sigma"):
         return sigma_hat
-    else:
+    elif type == "pearson":
         var_pred = np.var( model.predict().tolist() - np.log(df['working']) )
         var_actual = np.var( np.log( df['net_income'] ) )
         corr = ( var_actual + var_pred - pow(sigma_hat, 2) ) / (
             2 * pow(var_actual, 1/2) * pow(var_pred, 1/2)
         )
         return corr
+    elif type == "spearman":
+        df_corr = pd.DataFrame({
+            "actual": np.log(df['net_income']), 
+            "pred": model.predict()  - np.log(df['working'])
+            })
+        cov_matrix = df_corr.corr("spearman")
+        return cov_matrix.actual.iloc[1]
+    else:
+        raise TypeError("Argument supplied for type is invalid.")
         
 
 
