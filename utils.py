@@ -156,3 +156,4 @@ def generate_mle_model(df, initial_params):
     # print(f"Estimates are {model.x}.")
     
     return model
+
